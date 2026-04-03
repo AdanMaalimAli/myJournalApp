@@ -5,6 +5,7 @@ import Performance from "./pages/Performance";
 import DailyJournal from "./pages/DailyJournal";
 import Trades from "./pages/Trades";
 import Home from "./pages/Home";
+import Upgrade from "./pages/Upgrade";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 function App() {
@@ -24,6 +25,7 @@ function App() {
           <Route path="performance" element={<Performance />} />
           <Route path="dailyjournal" element={<DailyJournal />} />
           <Route path="trades" element={<Trades />} />
+          <Route path="upgrade" element={<Upgrade />} />
         </Route>
       </Route>
 

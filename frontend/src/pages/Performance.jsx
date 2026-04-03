@@ -33,21 +33,23 @@ import {
 } from 'recharts';
 import React, { useState, useMemo } from 'react';
 import { useTrades } from "../context/TradeContext";
+import { useTheme } from "../context/ThemeContext";
 import AddTradeModal from "./AddTradeModal";
 
 
 // --- UI Helpers ---
 
 const Card = ({ children, className = "" }) => (
-  <div className={`bg-white rounded-2xl border border-gray-100 shadow-sm ${className}`}>
+  <div className={`bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm transition-colors duration-300 ${className}`}>
     {children}
   </div>
 );
 
 const CustomTooltip = ({ active, payload, label }) => {
+  const { theme } = useTheme();
   if (active && payload && payload.length) {
     return (
-      <div className="bg-slate-800 text-white text-xs p-2 rounded-md shadow-xl">
+      <div className={`${theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-slate-900 border-transparent'} text-white text-xs p-2 rounded-md shadow-xl border`}>
         <p className="font-semibold mb-1">{label}</p>
         <p>
           <span className="opacity-70">{payload[0].name}:</span>{" "}
@@ -61,22 +63,22 @@ const CustomTooltip = ({ active, payload, label }) => {
 
 // --- Footer Component ---
 const Footer = () => (
-    <footer className="mt-16 pt-10 pb-8 border-t border-gray-200 bg-gray-50/50">
+    <footer className="mt-16 pt-10 pb-8 border-t border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900/50 transition-colors">
         <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-6">
             <div className="text-center md:text-left">
-                <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wide flex items-center gap-2">
+                <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide flex items-center gap-2">
                    <div className="w-2 h-2 rounded-full bg-emerald-500"></div> MyJournal Pro
                 </h4>
-                <p className="text-xs text-slate-500 mt-2">
+                <p className="text-xs text-slate-500 dark:text-slate-500 mt-2">
                     © {new Date().getFullYear()} Trading Journal Inc. Data for simulation only.
                 </p>
             </div>
-            <div className="flex gap-8 text-sm font-medium text-slate-600">
+            <div className="flex gap-8 text-sm font-medium text-slate-600 dark:text-slate-400">
                 <button className="hover:text-emerald-600 transition">Privacy</button>
                 <button className="hover:text-emerald-600 transition">Terms</button>
                 <button className="hover:text-emerald-600 transition">Support</button>
             </div>
-            <div className="flex gap-5 text-slate-400">
+            <div className="flex gap-5 text-slate-400 dark:text-slate-600">
                 <button className="hover:text-[#1DA1F2] transition transform hover:-translate-y-1"><FaTwitter size={20} /></button>
                 <button className="hover:text-[#5865F2] transition transform hover:-translate-y-1"><FaDiscord size={20} /></button>
                 <button className="hover:text-slate-600 transition transform hover:-translate-y-1"><FaGlobe size={20} /></button>
@@ -86,7 +88,7 @@ const Footer = () => (
 );
 
 export default function Performance() {
-
+  const { theme } = useTheme();
   const { 
     resetDatabase, 
     resetPerformance,
@@ -251,14 +253,14 @@ const weeklyPnl = useMemo(() => {
 
     if (selectedDay.pnl > 0) {
       return (
-        <Card className="p-6 bg-gradient-to-r from-emerald-50 to-white border-l-4 border-l-emerald-500 animate-fade-in-up">
+        <Card className="p-6 bg-gradient-to-r from-emerald-50 to-white dark:from-emerald-900/10 dark:to-slate-900 border-l-4 border-l-emerald-500 animate-fade-in-up transition-colors">
           <div className="flex items-start gap-4">
-            <div className="p-3 bg-white rounded-full shadow-sm text-emerald-500">
+            <div className="p-3 bg-white dark:bg-slate-800 rounded-full shadow-sm text-emerald-500">
               <FaTrophy size={24} />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-emerald-900">Great Execution!</h3>
-              <p className="text-sm text-emerald-700 mt-1 leading-relaxed">
+              <h3 className="text-lg font-bold text-emerald-900 dark:text-emerald-400">Great Execution!</h3>
+              <p className="text-sm text-emerald-700 dark:text-emerald-500/80 mt-1 leading-relaxed">
                 You capitalized on the market today. Ensure your winners followed your trading plan, not just luck. 
                 <span className="font-semibold block mt-1">Status: Disciplined & Profitable.</span>
               </p>
@@ -270,14 +272,14 @@ const weeklyPnl = useMemo(() => {
     
     if (selectedDay.pnl < 0) {
       return (
-        <Card className="p-6 bg-gradient-to-r from-rose-50 to-white border-l-4 border-l-rose-500 animate-fade-in-up">
+        <Card className="p-6 bg-gradient-to-r from-rose-50 to-white dark:from-rose-900/10 dark:to-slate-900 border-l-4 border-l-rose-500 animate-fade-in-up transition-colors">
           <div className="flex items-start gap-4">
-            <div className="p-3 bg-white rounded-full shadow-sm text-rose-500">
+            <div className="p-3 bg-white dark:bg-slate-800 rounded-full shadow-sm text-rose-500">
               <FaLightbulb size={24} />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-rose-900">Mental Reset Needed</h3>
-              <p className="text-sm text-rose-700 mt-1 leading-relaxed">
+              <h3 className="text-lg font-bold text-rose-900 dark:text-rose-400">Mental Reset Needed</h3>
+              <p className="text-sm text-rose-700 dark:text-rose-500/80 mt-1 leading-relaxed">
                 Losses are the tuition you pay to the market. Do not try to win it back immediately.
                 Review your rules: did you follow them?
                 <span className="font-semibold block mt-1">Advice: Accept the loss and protect your capital.</span>
@@ -292,33 +294,19 @@ const weeklyPnl = useMemo(() => {
   };
 
   return (
-    <div className="bg-slate-50/50 min-h-screen font-sans text-slate-800 pb-10">
+    <div className="bg-slate-50/50 dark:bg-transparent min-h-screen font-sans text-slate-800 dark:text-slate-100 pb-10 transition-colors duration-300">
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between">
            <div>
-            <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
+            <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
               Performance Dashboard
             </h1>
-            <p className="text-slate-500 text-sm mt-1">
+            <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
               {isLive && !isDemo ? "Viewing live broker data" : "Viewing simulation data"}
             </p>
-          </div>
-          <div className="flex items-center gap-3">
-            {isLive && !isDemo && (
-              <button 
-                onClick={resetPerformance}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-xl transition-all border border-rose-100"
-              >
-                <FaTimes size={14} />
-                Reset Performance
-              </button>
-            )}
-            <div className="text-xs text-slate-400 italic">
-               To add trades, go to <strong>Daily Journal</strong>
-            </div>
           </div>
         </div>
 
@@ -329,14 +317,14 @@ const weeklyPnl = useMemo(() => {
             {stats.map((stat, idx) => (
               <Card key={idx} className="p-5 hover:shadow-md transition duration-200">
                 <div className="flex items-center justify-between mb-4">
-                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                     {stat.title}
                   </span>
                   <div className={`p-2 rounded-lg ${stat.colorClass}`}>
                     {statIcons[idx]}
                   </div>
                 </div>
-                <div className={`text-2xl font-bold ${stat.valueColor || "text-slate-900"}`}>
+                <div className={`text-2xl font-bold ${stat.valueColor || (theme === 'dark' ? "text-white" : "text-slate-900")}`}>
                   {stat.value}
                 </div>
               </Card>
@@ -347,22 +335,22 @@ const weeklyPnl = useMemo(() => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
           {/* 🔵 CUMULATIVE P&L */}
-          <Card className="lg:col-span-8 p-6 flex flex-col border border-slate-100 shadow-sm">
+          <Card className="lg:col-span-8 p-6 flex flex-col border border-slate-100 dark:border-slate-800 shadow-sm transition-colors">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h2 className="font-bold text-slate-800 text-lg">Cumulative Net Profit</h2>
-                <p className="text-xs text-slate-500 mt-1 font-medium">Tracking your growth from $0</p>
+                <h2 className="font-bold text-slate-800 dark:text-white text-lg">Cumulative Net Profit</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-medium">Tracking your growth from $0</p>
               </div>
               <div className="flex items-center gap-2">
                 {isDemo || !isLive ? (
-                      <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-md">
                         <FaArrowUp size={8}/> GROWTH
                       </span>
                     ) : (
                       <span className={`flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-md ${
                         chartColor === "#f43f5e" 
-                          ? "text-rose-600 bg-rose-50" 
-                          : "text-emerald-600 bg-emerald-50"
+                          ? "text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20" 
+                          : "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20"
                       }`}>
                         {chartColor === "#f43f5e" ? (
                           <>
@@ -387,7 +375,7 @@ const weeklyPnl = useMemo(() => {
                     <stop offset="95%" stopColor={chartColor} stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme === 'dark' ? '#1e293b' : '#f1f5f9'} />
                 <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 11}} dy={10} />
                 <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 11}} />
                 <Tooltip content={<CustomTooltip />} />
@@ -407,26 +395,26 @@ const weeklyPnl = useMemo(() => {
 
           {/* 🟣 MONTHLY BREAKDOWN */}
 {/* 🟣 MONTHLY BREAKDOWN - UPDATED SECTION */}
-          <Card className="lg:col-span-4 p-6 flex flex-col border border-slate-100 shadow-sm">
+          <Card className="lg:col-span-4 p-6 flex flex-col border border-slate-100 dark:border-slate-800 shadow-sm transition-colors">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h2 className="font-bold text-slate-800 text-lg">Monthly Breakdown</h2>
-                <p className="text-xs text-slate-500 mt-1 font-medium">Net Monthly Performance</p>
+                <h2 className="font-bold text-slate-800 dark:text-white text-lg">Monthly Breakdown</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-medium">Net Monthly Performance</p>
               </div>
             </div>
             
             <div className="flex-1 w-full h-[200px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={monthlyBars}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fontSize: 11}} />
-                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 11}} />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme === 'dark' ? '#1e293b' : '#f1f5f9'} />
+                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 11}} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 11}} />
                   <Tooltip 
-                    cursor={{fill: '#f8fafc'}} 
+                    cursor={{fill: theme === 'dark' ? '#1e293b' : '#f8fafc'}} 
                     content={({ active, payload }) => {
                         if (active && payload && payload.length) {
                             return (
-                                <div className="bg-slate-800 text-white text-xs p-2 rounded-md shadow-xl">
+                                <div className={`${theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-slate-800 border-transparent'} text-white text-xs p-2 rounded-md shadow-xl border`}>
                                     <p className="font-semibold">{payload[0].payload.month}</p>
                                     <p className="font-mono mt-1">
                                         Net: {payload[0].value >= 0 ? '+' : ''}${payload[0].value.toLocaleString()}
@@ -447,7 +435,7 @@ const weeklyPnl = useMemo(() => {
                     ))}
                   </Bar>
                   {/* Adds a line at 0 for better visual reference */}
-                  <ReferenceLine y={0} stroke="#cbd5e1" strokeWidth={1} />
+                  <ReferenceLine y={0} stroke={theme === 'dark' ? '#334155' : '#cbd5e1'} strokeWidth={1} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -458,21 +446,21 @@ const weeklyPnl = useMemo(() => {
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
           
           <div className="xl:col-span-8 space-y-6">
-            <Card className="p-6">
+            <Card className="p-6 transition-colors">
               <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
-                <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                  <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                  <div className="p-2 bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 rounded-lg">
                     <FaCalendarAlt size={16} /> 
                   </div>
                   Trading Journal
                 </h2>
                 
-                <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-lg border border-slate-200">
-                  <button onClick={() => handleMonthChange(-1)} className="p-2 hover:bg-white hover:shadow-sm rounded-md transition text-slate-500 hover:text-slate-800">
+                <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700 transition-colors">
+                  <button onClick={() => handleMonthChange(-1)} className="p-2 hover:bg-white dark:hover:bg-slate-700 hover:shadow-sm rounded-md transition text-slate-500 hover:text-slate-800 dark:hover:text-white">
                       <FaChevronLeft size={12} />
                   </button>
-                  <span className="text-sm font-semibold min-w-[140px] text-center text-slate-700 select-none">{monthName}</span>
-                  <button onClick={() => handleMonthChange(1)} className="p-2 hover:bg-white hover:shadow-sm rounded-md transition text-slate-500 hover:text-slate-800">
+                  <span className="text-sm font-semibold min-w-[140px] text-center text-slate-700 dark:text-slate-200 select-none">{monthName}</span>
+                  <button onClick={() => handleMonthChange(1)} className="p-2 hover:bg-white dark:hover:bg-slate-700 hover:shadow-sm rounded-md transition text-slate-500 hover:text-slate-800 dark:hover:text-white">
                       <FaChevronRight size={12} />
                   </button>
                 </div>
@@ -480,7 +468,7 @@ const weeklyPnl = useMemo(() => {
               
               <div className="grid grid-cols-7 gap-3">
                 {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                    <div key={day} className="text-center text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{day}</div>
+                    <div key={day} className="text-center text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">{day}</div>
                 ))}
 
                 {calendarGrid.map((item) => {
@@ -488,22 +476,22 @@ const weeklyPnl = useMemo(() => {
 
                     const isSelected = selectedDay && selectedDay.dayOfMonth === item.dayOfMonth;
                     
-                    let bgClass = "bg-white";
-                    let textClass = "text-slate-400";
-                    let borderClass = "border-slate-100";
+                    let bgClass = "bg-white dark:bg-slate-900";
+                    let textClass = "text-slate-400 dark:text-slate-500";
+                    let borderClass = "border-slate-100 dark:border-slate-800";
                     
                     if (item.pnl > 0) {
-                        bgClass = "bg-emerald-50/60";
-                        borderClass = "border-emerald-100";
-                        textClass = "text-emerald-700";
+                        bgClass = "bg-emerald-50/60 dark:bg-emerald-900/20";
+                        borderClass = "border-emerald-100 dark:border-emerald-900/30";
+                        textClass = "text-emerald-700 dark:text-emerald-400";
                     } else if (item.pnl < 0) {
-                        bgClass = "bg-rose-50/60";
-                        borderClass = "border-rose-100";
-                        textClass = "text-rose-700";
+                        bgClass = "bg-rose-50/60 dark:bg-rose-900/20";
+                        borderClass = "border-rose-100 dark:border-rose-900/30";
+                        textClass = "text-rose-700 dark:text-rose-400";
                     }
 
                     if (item.isWeekend) {
-                        bgClass = "bg-slate-50 opacity-60";
+                        bgClass = "bg-slate-50 dark:bg-slate-800/40 opacity-60";
                         borderClass = "border-transparent";
                     }
 
@@ -514,11 +502,11 @@ const weeklyPnl = useMemo(() => {
                         className={`
                         h-24 rounded-xl p-3 relative flex flex-col justify-between border transition-all duration-200
                         ${bgClass} ${borderClass}
-                        ${!item.isWeekend ? 'cursor-pointer hover:border-slate-300 hover:shadow-md' : 'cursor-default'}
-                        ${isSelected ? 'ring-2 ring-indigo-500 ring-offset-2 z-10 shadow-lg !border-indigo-500' : ''}
+                        ${!item.isWeekend ? 'cursor-pointer hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-md' : 'cursor-default'}
+                        ${isSelected ? 'ring-2 ring-indigo-500 ring-offset-2 dark:ring-offset-slate-900 z-10 shadow-lg !border-indigo-500' : ''}
                         `}
                     >
-                        <span className={`text-xs font-semibold ${isSelected ? 'text-indigo-600' : 'text-slate-400'}`}>
+                        <span className={`text-xs font-semibold ${isSelected ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500'}`}>
                             {item.dayOfMonth}
                         </span>
                         
@@ -527,7 +515,7 @@ const weeklyPnl = useMemo(() => {
                             <div className={`text-sm font-bold ${textClass}`}>
                                 {item.pnl >= 0 ? '+' : ''}{item.pnl.toFixed(2)}
                             </div>
-                            <div className="text-[10px] text-slate-400 mt-1 font-medium">
+                            <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 font-medium">
                                 {item.trades} Trades
                             </div>
                         </div>
@@ -543,15 +531,15 @@ const weeklyPnl = useMemo(() => {
 
           <div className="xl:col-span-4 space-y-6">
              
-             <Card className="p-6">
-                <h3 className="font-bold text-slate-800 mb-5">Weekly Breakdown</h3>
+             <Card className="p-6 transition-colors">
+                <h3 className="font-bold text-slate-800 dark:text-white mb-5">Weekly Breakdown</h3>
                 <div className="space-y-3">
                     {weeklyPnl.map((week, idx) => {
                         const isProfitable = week.pnl >= 0;
                         return (
-                            <div key={idx} className="flex justify-between items-center p-3 rounded-lg bg-slate-50 border border-slate-100">
-                                <span className="text-sm font-medium text-slate-500">{week.label}</span>
-                                <span className={`font-bold font-mono ${isProfitable ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            <div key={idx} className="flex justify-between items-center p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 transition-colors">
+                                <span className="text-sm font-medium text-slate-500 dark:text-slate-400">{week.label}</span>
+                                <span className={`font-bold font-mono ${isProfitable ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
                                     {isProfitable ? '+' : ''}{week.pnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </span>
                             </div>
@@ -560,16 +548,16 @@ const weeklyPnl = useMemo(() => {
                 </div>
             </Card>
 
-            <Card className="p-0 overflow-hidden flex flex-col h-auto max-h-[500px]">
-                <div className="p-5 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
+            <Card className="p-0 overflow-hidden flex flex-col h-auto max-h-[500px] transition-colors">
+                <div className="p-5 border-b border-slate-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/50 flex justify-between items-center transition-colors">
                     <div>
-                         <h3 className="font-bold text-slate-800">Trade History</h3>
-                         <p className="text-xs text-slate-500 mt-0.5">
+                         <h3 className="font-bold text-slate-800 dark:text-white">Trade History</h3>
+                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                             {selectedDay ? selectedDay.date.toDateString() : "Select a day"}
                          </p>
                     </div>
                     {selectedDay && (
-                         <div className={`text-sm font-bold px-2 py-1 rounded ${selectedDay.pnl >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                         <div className={`text-sm font-bold px-2 py-1 rounded ${selectedDay.pnl >= 0 ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400' : 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-400'}`}>
                             {selectedDay.pnl >= 0 ? '+' : ''}{selectedDay.pnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                          </div>
                     )}
@@ -579,31 +567,31 @@ const weeklyPnl = useMemo(() => {
                     {selectedDay ? (
                         <div className="space-y-1">
                         {tradesForSelected.length === 0 ? (
-                            <div className="text-sm text-slate-400 text-center py-8 italic">No trades recorded.</div>
+                            <div className="text-sm text-slate-400 dark:text-slate-500 text-center py-8 italic">No trades recorded.</div>
                         ) : tradesForSelected.map(t => (
-                            <div key={t.id} className="group flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 transition border border-transparent hover:border-slate-200">
+                            <div key={t.id} className="group flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition border border-transparent hover:border-slate-200 dark:hover:border-slate-700">
                                 <div className="flex items-center gap-3">
                                     <div className={`w-1 h-8 rounded-full ${t.type === 'Buy' ? 'bg-emerald-400' : 'bg-rose-400'}`}></div>
                                     <div>
-                                        <div className="font-bold text-slate-700 text-sm flex items-center gap-2">
+                                        <div className="font-bold text-slate-700 dark:text-slate-200 text-sm flex items-center gap-2">
                                             {t.pair} 
-                                            <span className={`text-[10px] uppercase px-1.5 py-0.5 rounded ${t.type === 'Buy' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                                            <span className={`text-[10px] uppercase px-1.5 py-0.5 rounded ${t.type === 'Buy' ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400' : 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-400'}`}>
                                                 {t.type}
                                             </span>
                                         </div>
-                                        <div className="text-xs text-slate-400 font-mono mt-0.5">
-                                            {typeof t.entry === 'number' ? t.entry.toFixed(2) : t.entry} <span className="text-slate-300">➜</span> {typeof t.exit === 'number' ? t.exit.toFixed(2) : t.exit}
+                                        <div className="text-xs text-slate-400 dark:text-slate-500 font-mono mt-0.5">
+                                            {typeof t.entry === 'number' ? t.entry.toFixed(2) : t.entry} <span className="text-slate-300 dark:text-slate-600">➜</span> {typeof t.exit === 'number' ? t.exit.toFixed(2) : t.exit}
                                         </div>
                                     </div>
                                 </div>
-                                <div className={`font-bold font-mono text-sm ${t.pnl >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                                <div className={`font-bold font-mono text-sm ${t.pnl >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
                                     {t.pnl >= 0 ? `+$${t.pnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `-$${Math.abs(t.pnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                                 </div>
                             </div>
                         ))}
                         </div>
                     ) : (
-                        <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                        <div className="flex flex-col items-center justify-center py-12 text-slate-400 dark:text-slate-600">
                             <FaCalendarAlt size={32} className="opacity-20 mb-3" />
                             <p className="text-sm">Select a date to view trades</p>
                         </div>

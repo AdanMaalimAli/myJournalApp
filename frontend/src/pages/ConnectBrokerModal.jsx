@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { FaServer, FaUser, FaKey, FaLink, FaCheckCircle, FaCircleNotch, FaExclamationTriangle } from 'react-icons/fa';
 import Modal from '../components/Modal';
 import { useAuth } from '../context/AuthContext';
 
 export default function ConnectBrokerModal({ onClose }) {
   const { token, user, refreshUser } = useAuth();
+  const navigate = useNavigate();
   const [platform, setPlatform] = useState('MT5');
   const [accountNumber, setAccountNumber] = useState('');
   const [brokerServer, setBrokerServer] = useState('');
@@ -69,7 +71,10 @@ export default function ConnectBrokerModal({ onClose }) {
                     Automated broker sync is only available for Pro Trader members.
                 </p>
                 <button 
-                    onClick={onClose}
+                    onClick={() => {
+                        onClose();
+                        navigate('/dashboard/upgrade');
+                    }}
                     className="w-full py-3 bg-amber-500 text-white rounded-xl font-bold hover:bg-amber-600 transition"
                 >
                     Upgrade Now

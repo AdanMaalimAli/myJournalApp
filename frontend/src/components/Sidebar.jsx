@@ -1,20 +1,19 @@
 import React, { useState } from "react";
 import { FaChartBar, FaBook, FaTable, FaLink, FaCrown } from "react-icons/fa";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import AddTradeModal from "../pages/AddTradeModal";
 import ConnectBrokerModal from "../pages/ConnectBrokerModal";
-import UpgradeModal from "../pages/UpgradeModal";
 import { useAuth } from "../context/AuthContext";
 
 export default function Sidebar({ activePage, setActivePage }) {
   const { user } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const isActive = (path) => location.pathname === path;
 
   // --- MODAL STATE ---
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isBrokerModalOpen, setIsBrokerModalOpen] = useState(false);
-  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
 
   const handleSaveTrade = (tradeData) => {
     console.log("Saving new trade:", tradeData);
@@ -23,22 +22,24 @@ export default function Sidebar({ activePage, setActivePage }) {
 
   return (
     <>
-      <div className="w-64 shrink-0 h-screen bg-[#2a154b] text-white p-6 flex flex-col space-y-10">
+      <div className="w-64 shrink-0 h-screen bg-[#2a154b] dark:bg-[#0b0f19] text-white p-6 flex flex-col space-y-10 transition-colors duration-300">
         
         {/* Logo */}
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-white/20 backdrop-blur-md border border-white/30 rounded-lg flex items-center justify-center text-xl font-bold text-white">
-            mJ
-          </div>
-          <h1 className="text-xl font-semibold tracking-wide bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 bg-clip-text text-transparent">
-            myJournal
-          </h1>
+          <Link to="/dashboard/performance" className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-white/20 dark:bg-slate-800/50 backdrop-blur-md border border-white/30 dark:border-slate-700/50 rounded-lg flex items-center justify-center text-xl font-bold text-white">
+              mJ
+            </div>
+            <h1 className="text-xl font-semibold tracking-wide bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 bg-clip-text text-transparent">
+              myJournal
+            </h1>
+          </Link>
         </div>
 
         {/* Add Trade Button - NOW INTERACTIVE */}
         <button 
           onClick={() => setIsModalOpen(true)}
-          className="w-full bg-[#7d4cff] hover:bg-[#6b3ee0] transition text-white py-2 rounded-lg font-medium"
+          className="w-full bg-[#7d4cff] dark:bg-indigo-600 hover:bg-[#6b3ee0] dark:hover:bg-indigo-700 transition-all text-white py-2 rounded-lg font-medium shadow-lg shadow-purple-900/20 dark:shadow-none"
         >
           + Add Trade
         </button>
@@ -48,7 +49,7 @@ export default function Sidebar({ activePage, setActivePage }) {
             <Link
             to="/dashboard/performance"
             className={`flex items-center space-x-3 p-3 rounded-lg cursor-pointer transition ${
-              isActive("/dashboard/performance") ? "bg-[#3b1f63]" : "hover:bg-[#3b1f63]"
+              isActive("/dashboard/performance") ? "bg-[#3b1f63] dark:bg-indigo-900/40 border border-white/10" : "hover:bg-[#3b1f63] dark:hover:bg-slate-800/50"
             }`}
           >
             <FaChartBar size={20} />
@@ -58,7 +59,7 @@ export default function Sidebar({ activePage, setActivePage }) {
         <Link
             to="/dashboard/dailyjournal"
             className={`flex items-center space-x-3 p-3 rounded-lg cursor-pointer transition ${
-              isActive("/dashboard/dailyjournal") ? "bg-[#3b1f63]" : "hover:bg-[#3b1f63]"
+              isActive("/dashboard/dailyjournal") ? "bg-[#3b1f63] dark:bg-indigo-900/40 border border-white/10" : "hover:bg-[#3b1f63] dark:hover:bg-slate-800/50"
             }`}
           >
             <FaBook size={20} />
@@ -68,7 +69,7 @@ export default function Sidebar({ activePage, setActivePage }) {
         <Link
             to="/dashboard/trades"
             className={`flex items-center space-x-3 p-3 rounded-lg cursor-pointer transition ${
-              isActive("/dashboard/trades") ? "bg-[#3b1f63]" : "hover:bg-[#3b1f63]"
+              isActive("/dashboard/trades") ? "bg-[#3b1f63] dark:bg-indigo-900/40 border border-white/10" : "hover:bg-[#3b1f63] dark:hover:bg-slate-800/50"
             }`}
           >
             <FaTable size={20} />
@@ -95,7 +96,7 @@ export default function Sidebar({ activePage, setActivePage }) {
                         Automated sync, unlimited history & AI insights.
                     </p>
                     <button 
-                        onClick={() => setIsUpgradeModalOpen(true)}
+                        onClick={() => navigate('/dashboard/upgrade')}
                         className="w-full bg-white text-purple-900 py-2 rounded-lg text-xs font-bold hover:bg-purple-50 transition"
                     >
                         Get Pro - $11
@@ -114,10 +115,6 @@ export default function Sidebar({ activePage, setActivePage }) {
 
       {isBrokerModalOpen && (
         <ConnectBrokerModal onClose={() => setIsBrokerModalOpen(false)} />
-      )}
-
-      {isUpgradeModalOpen && (
-        <UpgradeModal onClose={() => setIsUpgradeModalOpen(false)} />
       )}
     </>
   );

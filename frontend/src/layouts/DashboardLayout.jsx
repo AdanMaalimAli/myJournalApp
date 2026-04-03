@@ -13,17 +13,17 @@ export default function DashboardLayout() {
   else if (location.pathname.includes("trades")) title = "Trades";
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden">
+    <div className="flex h-screen w-full overflow-hidden">
       {/* Sidebar */}
       <Sidebar />
 
       {/* Main area */}
-      <div className="flex flex-col flex-1">
+      <div className="flex flex-col flex-1 min-w-0">
         {/* Navbar */}
         <Navbar title={title} />
         
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto bg-gray-200  p-6">
+        <main className="flex-1 overflow-y-auto bg-gray-200 dark:bg-[#0b0f19] p-6 transition-colors duration-300">
           <Outlet />
         </main>
       </div>

@@ -34,7 +34,7 @@ const Badge = ({ children, color = "slate" }) => {
 export default function DailyJournal({ date: propDate = new Date(), trades: propTrades }) {
   
   // --- CONTEXT & DATE STATE ---
-  const { realTrades, uploadedTrades, isLive, isDemo, journalData, saveDailyJournal, updateTrade, showNotification } = useTrades() || {};
+  const { realTrades, uploadedTrades, isLive, isDemo, journalData, saveDailyJournal, updateTrade, showNotification, importTrades } = useTrades() || {};
   const [currentDate, setCurrentDate] = useState(propDate);
 
   // Auto-navigate to latest trade on import/load
@@ -269,114 +269,34 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
     }
   };
 
-  const handleTradeImport = (e) => {
+  const handleTradeImport = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-        try {
-            const text = event.target.result;
-            const rows = text.split('\n').filter(row => row.trim() !== '');
-            
-            const splitCSVRow = (row) => {
-                const result = [];
-                let current = '';
-                let inQuotes = false;
-                for (let i = 0; i < row.length; i++) {
-                  const char = row[i];
-                  if (char === '"') {
-                    inQuotes = !inQuotes;
-                  } else if (char === ',' && !inQuotes) {
-                    result.push(current.trim().replace(/^"|"$/g, ''));
-                    current = '';
-                  } else {
-                    current += char;
-                  }
-                }
-                result.push(current.trim().replace(/^"|"$/g, ''));
-                return result;
-            };
-
-            const parsedRows = rows.map(splitCSVRow);
-            const headerRowIndex = parsedRows.findIndex(row => 
-                row.some(cell => /PnL|Ticket|Close Time/i.test(cell))
-            );
-
-            if (headerRowIndex === -1) {
-                alert("Invalid CSV format: Headers not found.");
-                return;
-            }
-
-            const headers = parsedRows[headerRowIndex].map(h => h.toLowerCase());
-            const dataRows = parsedRows.slice(headerRowIndex + 1);
-
-            const colMap = {
-                ticket: headers.findIndex(h => h.includes('ticket')),
-                pnl: headers.findIndex(h => h === 'pnl'),
-                pair: headers.findIndex(h => h === 'symbol'),
-                date: headers.findIndex(h => h === 'close time'),
-                type: headers.findIndex(h => h === 'side'),
-                entry: headers.findIndex(h => h === 'open price'),
-                exit: headers.findIndex(h => h === 'close price'),
-                sl: headers.findIndex(h => h === 'sl'),
-                tp: headers.findIndex(h => h === 'tp'),
-                duration: headers.findIndex(h => h === 'duration'),
-                lots: headers.findIndex(h => h === 'lots'),
-                commission: headers.findIndex(h => h === 'commissions'),
-                gain: headers.findIndex(h => h === 'gain')
-            };
-
-            const newTrades = dataRows.map((cols, i) => {
-                if (cols.length < 2 || !cols[colMap.pnl]) return null;
-
-                let cleanDate = "";
-                const rawDateStr = cols[colMap.date]; 
-                if (rawDateStr && rawDateStr.includes('/')) {
-                  const dateOnly = rawDateStr.split(' ')[0]; 
-                  const [d, m, y] = dateOnly.split('/');     
-                  cleanDate = `${y}-${m}-${d}`;              
-                }
-
-                // Filter for CURRENT DATE only
-                if (cleanDate !== dateKey) return null;
-
-                const rawPnl = cols[colMap.pnl].replace(/[$,]/g, "");
-                return {
-                  id: cols[colMap.ticket] || `trade-${Date.now()}-${i}`,
-                  date: cleanDate, 
-                  pair: cols[colMap.pair]?.toUpperCase() || "UNKNOWN",
-                  type: cols[colMap.type] || "Trade",
-                  pnl: parseFloat(rawPnl) || 0,
-                  entry: parseFloat(cols[colMap.entry]) || 0,
-                  exit: parseFloat(cols[colMap.exit]) || 0,
-                  sl: parseFloat(cols[colMap.sl]) || 0,
-                  tp: parseFloat(cols[colMap.tp]) || 0,
-                  duration: cols[colMap.duration] || "",
-                  lots: parseFloat(cols[colMap.lots]) || 0,
-                  commission: parseFloat(cols[colMap.commission]) || 0,
-                  roi: parseFloat(cols[colMap.gain]?.replace(/[%,]/g, "") || "0") || 0
-                };
-            }).filter(t => t !== null);
-
-            if (newTrades.length > 0) {
-                setLocalTrades(prev => {
-                     // Merge new trades, avoiding duplicates by ID
-                     const existingIds = new Set(prev.map(t => t.id));
-                     const uniqueNew = newTrades.filter(t => !existingIds.has(t.id));
-                     return [...prev, ...uniqueNew];
-                });
-                alert(`Imported ${newTrades.length} trades for ${dateKey}.`);
-            } else {
-                alert(`No trades found for ${dateKey} in this CSV.`);
-            }
-
-        } catch (err) {
-            console.error(err);
-            alert("Error parsing CSV");
+    try {
+        const parsed = await importTrades(file);
+        // Filter for current date for local display if needed, 
+        // but the context now holds ALL trades for the calendar.
+        const todaysTrades = parsed.filter(t => t.date === dateKey);
+        
+        if (todaysTrades.length > 0) {
+            setLocalTrades(prev => {
+                 const existingIds = new Set(prev.map(t => t.id || t.ticket));
+                 const uniqueNew = todaysTrades.filter(t => !existingIds.has(t.id || t.ticket));
+                 return [...prev, ...uniqueNew];
+            });
         }
-    };
-    reader.readAsText(file);
+        
+        if (parsed.length > 0) {
+            showNotification(`Imported ${parsed.length} trades. Calendar updated.`, "success");
+        } else {
+            showNotification("No valid trades found in CSV.", "error");
+        }
+    } catch (err) {
+        console.error(err);
+        showNotification("Error parsing CSV", "error");
+    }
+    
     e.target.value = null; // Reset input
   };
 
@@ -434,28 +354,28 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
   };
 
   return (
-    <div className="bg-slate-50/50 min-h-screen pb-12 font-sans text-slate-800">
+    <div className="bg-slate-50/50 dark:bg-transparent min-h-screen pb-12 font-sans text-slate-800 dark:text-slate-100 transition-colors duration-300">
       
       {/* --- HEADER --- */}
-      <div className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+      <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30 shadow-sm transition-colors duration-300">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex justify-between items-center">
             <div className="flex items-center gap-4">
                
                 <div>
-                    <h1 className="text-lg font-bold text-slate-900 leading-tight">Journal your Day</h1>
+                    <h1 className="text-lg font-bold text-slate-900 dark:text-white leading-tight">Journal your Day</h1>
                     {/* Date Navigation */}
-                    <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500 font-medium bg-slate-100/50 px-2 py-1 rounded-md">
-                      <button onClick={() => changeDate(-1)} className="hover:text-indigo-600 transition"><FaChevronLeft size={10}/></button>
+                    <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500 dark:text-slate-400 font-medium bg-slate-100/50 dark:bg-slate-800/50 px-2 py-1 rounded-md transition-colors">
+                      <button onClick={() => changeDate(-1)} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition"><FaChevronLeft size={10}/></button>
                       <span className="min-w-[80px] text-center">{currentDate.toDateString()}</span>
-                      <button onClick={() => changeDate(1)} className="hover:text-indigo-600 transition"><FaChevronRight size={10}/></button>
-                      <button onClick={() => setCurrentDate(new Date())} className="ml-1 hover:text-indigo-600" title="Go to Today"><FaCalendarDay size={10}/></button>
+                      <button onClick={() => changeDate(1)} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition"><FaChevronRight size={10}/></button>
+                      <button onClick={() => setCurrentDate(new Date())} className="ml-1 hover:text-indigo-600 dark:hover:text-indigo-400" title="Go to Today"><FaCalendarDay size={10}/></button>
                     </div>
                 </div>
             </div>
             
             <div className="flex items-center gap-4">
-                 <div className="hidden md:flex items-center gap-2 mr-4 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
-                     <span className="text-xs font-semibold text-slate-500 uppercase">Net P&L:</span>
+                 <div className="hidden md:flex items-center gap-2 mr-4 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 transition-colors">
+                     <span className="text-xs font-semibold text-slate-500 dark:text-slate-500 uppercase">Net P&L:</span>
                      <span className={`text-sm font-bold ${netPnL >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                          {netPnL >= 0 ? '+' : ''}${netPnL.toFixed(2)}
                      </span>
@@ -464,9 +384,9 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
                     onClick={handleSave}
                     disabled={saveStatus !== "idle"}
                     className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 shadow-lg min-w-[140px] justify-center ${
-                        saveStatus === "saving" ? "bg-slate-700 text-white cursor-wait" : 
-                        saveStatus === "saved" ? "bg-emerald-500 text-white shadow-emerald-200" : 
-                        "bg-slate-900 hover:bg-slate-800 text-white shadow-slate-200 active:scale-95"
+                        saveStatus === "saving" ? "bg-slate-700 dark:bg-slate-800 text-white cursor-wait" : 
+                        saveStatus === "saved" ? "bg-emerald-500 text-white shadow-emerald-200 dark:shadow-none" : 
+                        "bg-slate-900 dark:bg-indigo-600 hover:bg-slate-800 dark:hover:bg-indigo-700 text-white shadow-slate-200 dark:shadow-none active:scale-95"
                     }`}
                  >
                     {saveStatus === "saving" ? (
@@ -487,16 +407,16 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             
             {/* 1. Scorecard & Key Stats (Span 4) */}
-            <Card className="lg:col-span-4 p-6 flex flex-col justify-between">
+            <Card className="lg:col-span-4 p-6 flex flex-col justify-between bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 transition-colors">
                 <div>
-                    <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wide mb-4 flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-slate-500 dark:text-slate-500 uppercase tracking-wide mb-4 flex items-center gap-2">
                         <FaStar className="text-amber-400" /> Session Scorecard
                     </h3>
                     
                     <div className="flex items-center justify-between mb-6">
                         <div className="flex flex-col">
-                            <span className="text-4xl font-extrabold text-slate-800">{sessionRating}/5</span>
-                            <span className="text-xs text-slate-400 mt-1">Discipline Rating</span>
+                            <span className="text-4xl font-extrabold text-slate-800 dark:text-white">{sessionRating}/5</span>
+                            <span className="text-xs text-slate-400 dark:text-slate-500 mt-1">Discipline Rating</span>
                         </div>
                         <div className="flex gap-1">
                             {[1,2,3,4,5].map(star => (
@@ -505,21 +425,21 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
                         </div>
                     </div>
                     
-                    <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-100">
+                    <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-100 dark:border-slate-800">
                         <div>
-                            <span className="text-xs text-slate-400 block mb-0.5">Total Duration</span>
-                            <span className="text-lg font-bold text-slate-800">{totalDuration}</span>
+                            <span className="text-xs text-slate-400 dark:text-slate-500 block mb-0.5">Total Duration</span>
+                            <span className="text-lg font-bold text-slate-800 dark:text-slate-200">{totalDuration}</span>
                         </div>
                         <div>
-                            <span className="text-xs text-slate-400 block mb-0.5">Win Rate</span>
-                            <span className={`text-lg font-bold ${winRate >= 50 ? 'text-emerald-600' : 'text-slate-800'}`}>{winRate}%</span>
+                            <span className="text-xs text-slate-400 dark:text-slate-500 block mb-0.5">Win Rate</span>
+                            <span className={`text-lg font-bold ${winRate >= 50 ? 'text-emerald-600' : 'text-slate-800 dark:text-slate-200'}`}>{winRate}%</span>
                         </div>
                         <div>
-                            <span className="text-xs text-slate-400 block mb-0.5">Total Trades</span>
-                            <span className="text-lg font-bold text-slate-800">{totalTrades}</span>
+                            <span className="text-xs text-slate-400 dark:text-slate-500 block mb-0.5">Total Trades</span>
+                            <span className="text-lg font-bold text-slate-800 dark:text-slate-200">{totalTrades}</span>
                         </div>
                         <div>
-                            <span className="text-xs text-slate-400 block mb-0.5">Commissions</span>
+                            <span className="text-xs text-slate-400 dark:text-slate-500 block mb-0.5">Commissions</span>
                             <span className="text-lg font-bold text-rose-500">-${commissions}</span>
                         </div>
                     </div>
@@ -527,9 +447,9 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
             </Card>
 
             {/* 2. Main PnL Chart (Span 8) */}
-            <Card className="lg:col-span-8 p-6 flex flex-col bg-white">
+            <Card className="lg:col-span-8 p-6 flex flex-col bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 transition-colors">
                 <div className="flex justify-between items-center mb-2">
-                     <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wide flex items-center gap-2">
+                     <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide flex items-center gap-2">
                         <FaChartLine className="text-indigo-500" /> Intraday Performance
                      </h3>
                      <Badge color={netPnL >= 0 ? "emerald" : "rose"}>{netPnL >= 0 ? "Profitable Session" : "Red Day"}</Badge>
@@ -545,14 +465,14 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
                                     <stop offset="95%" stopColor={netPnL >= 0 ? "#10b981" : "#f43f5e"} stopOpacity={0}/>
                                 </linearGradient>
                             </defs>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme === 'dark' ? '#1e293b' : '#f1f5f9'} />
                             <XAxis dataKey="trade" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 11}} />
                             <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 11}} />
                             <Tooltip 
-                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', backgroundColor: theme === 'dark' ? '#0f172a' : '#ffffff', color: theme === 'dark' ? '#ffffff' : '#000000' }}
                                 formatter={(value) => [`$${value}`, "Net PnL"]}
                             />
-                            <ReferenceLine y={0} stroke="#cbd5e1" strokeDasharray="3 3" />
+                            <ReferenceLine y={0} stroke={theme === 'dark' ? '#334155' : '#cbd5e1'} strokeDasharray="3 3" />
                             <Area 
                                 type="monotone" 
                                 dataKey="pnl" 
@@ -564,7 +484,7 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
                             </AreaChart>
                         </ResponsiveContainer>
                      ) : (
-                         <div className="flex items-center justify-center h-full text-slate-300 italic text-sm">
+                         <div className="flex items-center justify-center h-full text-slate-300 dark:text-slate-700 italic text-sm">
                              No trades executed today
                          </div>
                      )}
@@ -578,11 +498,11 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
              {/* LEFT: JOURNAL EDITOR (Span 2) */}
             <div className="lg:col-span-2 space-y-6">
                 
-                <Card className="flex flex-col min-h-[600px] overflow-hidden shadow-lg border-slate-200 ring-1 ring-slate-100">
+                <Card className="flex flex-col min-h-[600px] overflow-hidden shadow-lg border-slate-200 dark:border-slate-800 ring-1 ring-slate-100 dark:ring-slate-900 bg-white dark:bg-slate-900 transition-colors">
                     {/* Professional Toolbar */}
-                    <div className="bg-slate-50/80 backdrop-blur-sm border-b border-slate-200 p-2 flex flex-wrap items-center gap-2 sticky top-0 z-10">
+                    <div className="bg-slate-50/80 dark:bg-slate-800/80 backdrop-blur-sm border-b border-slate-200 dark:border-slate-700 p-2 flex flex-wrap items-center gap-2 sticky top-0 z-10">
                          {/* Formatting Group */}
-                         <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1 shadow-sm">
+                         <div className="flex items-center gap-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-1 shadow-sm">
                              {[
                                 { cmd: 'bold', icon: <FaBold />, title: "Bold" },
                                 { cmd: 'italic', icon: <FaItalic />, title: "Italic" },
@@ -591,16 +511,16 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
                                  <button 
                                     key={item.cmd} 
                                     onMouseDown={(e) => {e.preventDefault(); handleFormat(item.cmd)}} 
-                                    className="w-8 h-8 flex items-center justify-center rounded hover:bg-indigo-50 hover:text-indigo-600 text-slate-500 transition-colors"
+                                    className="w-8 h-8 flex items-center justify-center rounded hover:bg-indigo-50 dark:hover:bg-indigo-900/40 hover:text-indigo-600 dark:hover:text-indigo-400 text-slate-500 dark:text-slate-400 transition-colors"
                                     title={item.title}
                                  >
                                      {item.icon}
                                  </button>
                              ))}
-                             <div className="w-px h-4 bg-slate-200 mx-1"></div>
+                             <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-1"></div>
                              <button 
                                 onMouseDown={(e) => {e.preventDefault(); handleFormat('insertUnorderedList')}} 
-                                className="w-8 h-8 flex items-center justify-center rounded hover:bg-indigo-50 hover:text-indigo-600 text-slate-500 transition-colors"
+                                className="w-8 h-8 flex items-center justify-center rounded hover:bg-indigo-50 dark:hover:bg-indigo-900/40 hover:text-indigo-600 dark:hover:text-indigo-400 text-slate-500 dark:text-slate-400 transition-colors"
                                 title="Bullet List"
                              >
                                 <FaListUl />
@@ -608,10 +528,10 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
                          </div>
 
                          {/* Media Group */}
-                         <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1 shadow-sm">
+                         <div className="flex items-center gap-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-1 shadow-sm">
                              <button 
                                 onClick={() => fileInputRef.current.click()} 
-                                className="w-8 h-8 flex items-center justify-center rounded hover:bg-indigo-50 hover:text-indigo-600 text-slate-500 transition-colors"
+                                className="w-8 h-8 flex items-center justify-center rounded hover:bg-indigo-50 dark:hover:bg-indigo-900/40 hover:text-indigo-600 dark:hover:text-indigo-400 text-slate-500 dark:text-slate-400 transition-colors"
                                 title="Upload Image"
                              >
                                 <FaImage />
@@ -623,12 +543,12 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
 
                          {/* Quick Templates */}
                          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
-                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1 hidden sm:inline">Templates:</span>
+                             <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mr-1 hidden sm:inline">Templates:</span>
                              {tradingTemplates.map((t, idx) => (
                                  <button 
                                     key={idx} 
                                     onClick={() => insertTemplate(t.text, t.color)}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-white border border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-600 hover:shadow-sm transition-all whitespace-nowrap"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-indigo-300 dark:hover:border-indigo-600 hover:text-indigo-600 dark:hover:text-indigo-400 hover:shadow-sm transition-all whitespace-nowrap"
                                  >
                                      <span>{t.icon}</span>
                                      <span>{t.label}</span>
@@ -638,19 +558,19 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
                     </div>
 
                     {/* Editor Area */}
-                    <div className="relative flex-1 bg-white cursor-text" onClick={() => editorRef.current?.focus()}>
+                    <div className="relative flex-1 bg-white dark:bg-slate-900 cursor-text" onClick={() => editorRef.current?.focus()}>
                         <div
                             ref={editorRef}
                             contentEditable={true}
                             spellCheck={false}
                             onInput={handleInput}
-                            className="w-full h-full p-8 outline-none text-slate-700 text-lg leading-8 font-serif"
+                            className="w-full h-full p-8 outline-none text-slate-700 dark:text-slate-300 text-lg leading-8 font-serif transition-colors"
                             style={{ minHeight: '400px' }}
                         />
                         {isEditorEmpty && (
-                            <div className="absolute top-8 left-8 text-slate-300 text-lg font-serif italic pointer-events-none select-none">
+                            <div className="absolute top-8 left-8 text-slate-300 dark:text-slate-700 text-lg font-serif italic pointer-events-none select-none">
                                 Start typing your daily review... <br/>
-                                <span className="text-sm not-italic text-slate-300/70 mt-2 block font-sans">
+                                <span className="text-sm not-italic text-slate-300/70 dark:text-slate-700/70 mt-2 block font-sans">
                                     💡 Tip: Use templates to structure your thoughts.
                                 </span>
                             </div>
@@ -659,18 +579,18 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
 
                     {/* Image Preview Strip (Improved) */}
                     {images.length > 0 && (
-                        <div className="bg-slate-50 border-t border-slate-100 p-4">
-                            <h5 className="text-xs font-bold text-slate-400 uppercase mb-3 ml-1">Attached Evidence</h5>
+                        <div className="bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800 p-4 transition-colors">
+                            <h5 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase mb-3 ml-1">Attached Evidence</h5>
                             <div className="flex gap-4 overflow-x-auto pb-2">
                                 {images.map((img, idx) => (
                                     <div key={idx} className="relative group flex-shrink-0">
-                                        <div className="w-32 h-24 rounded-lg overflow-hidden border border-slate-200 shadow-sm bg-white">
+                                        <div className="w-32 h-24 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm bg-white dark:bg-slate-900">
                                             <img src={img} alt="Evidence" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                                         </div>
                                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg pointer-events-none" />
                                         <button 
                                             onClick={() => setImages(images.filter((_, i) => i !== idx))} 
-                                            className="absolute -top-2 -right-2 bg-white text-rose-500 border border-slate-200 p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-all shadow-md hover:bg-rose-50"
+                                            className="absolute -top-2 -right-2 bg-white dark:bg-slate-800 text-rose-500 border border-slate-200 dark:border-slate-700 p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-all shadow-md hover:bg-rose-50 dark:hover:bg-rose-900/20"
                                             title="Remove Image"
                                         >
                                             <FaTimes size={10}/>
@@ -683,13 +603,13 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
                 </Card>
 
                 {/* Trades Table */}
-                <Card className="overflow-hidden">
-                    <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                <Card className="overflow-hidden bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 transition-colors">
+                    <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 flex justify-between items-center">
                         <div className="flex items-center gap-4">
-                            <h3 className="font-bold text-slate-700 text-sm uppercase">Session Draft (Not Saved)</h3>
+                            <h3 className="font-bold text-slate-700 dark:text-slate-300 text-sm uppercase">Session Draft (Not Saved)</h3>
                             <button 
                                 onClick={() => tradeFileInputRef.current?.click()}
-                                className="text-xs font-medium text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded transition"
+                                className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 px-2.5 py-1 rounded transition"
                             >
                                 + Import CSV
                             </button>
@@ -701,14 +621,14 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
                                 accept=".csv" 
                             />
                         </div>
-                        <span className="text-xs text-slate-400">{totalTrades} Trades in Draft</span>
+                        <span className="text-xs text-slate-400 dark:text-slate-500">{totalTrades} Trades in Draft</span>
                     </div>
                     {totalTrades === 0 ? (
-                        <div className="p-8 text-center text-slate-400 text-sm">No trades recorded for this session.</div>
+                        <div className="p-8 text-center text-slate-400 dark:text-slate-600 text-sm italic">No trades recorded for this session.</div>
                     ) : (
                         <div className="overflow-x-auto">
                             <table className="min-w-full text-sm">
-                                <thead className="bg-slate-50 text-slate-500 font-medium">
+                                <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 font-medium">
                                     <tr>
                                         <th className="px-6 py-3 text-left">Symbol</th>
                                         <th className="px-6 py-3 text-left">Side</th>
@@ -716,17 +636,17 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
                                         <th className="px-6 py-3 text-right">Result</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-100">
+                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                                     {localTrades.map((t, idx) => (
-                                        <tr key={idx} className="hover:bg-slate-50/80 transition">
-                                            <td className="px-6 py-3 font-semibold text-slate-700">{t.pair}</td>
+                                        <tr key={idx} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition">
+                                            <td className="px-6 py-3 font-semibold text-slate-700 dark:text-slate-300">{t.pair}</td>
                                             <td className="px-6 py-3">
                                                 <Badge color={t.type === 'Long' ? 'emerald' : 'rose'}>{t.type}</Badge>
                                             </td>
-                                            <td className="px-6 py-3 text-slate-500">
+                                            <td className="px-6 py-3 text-slate-500 dark:text-slate-400">
                                                 <div className="flex items-center gap-2">
                                                     <span className="font-mono">{t.entry}</span> 
-                                                    <span className="text-xs text-slate-300">➜</span> 
+                                                    <span className="text-xs text-slate-300 dark:text-slate-700">➜</span> 
                                                     <span className="font-mono">{t.exit}</span>
                                                 </div>
                                             </td>
@@ -746,8 +666,8 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
             <div className="space-y-6">
                 
                 {/* 1. Market Conditions */}
-                <Card className="p-5">
-                    <h4 className="text-xs font-bold text-slate-400 uppercase mb-3 flex items-center gap-2">
+                <Card className="p-5 bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 transition-colors">
+                    <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase mb-3 flex items-center gap-2">
                         <FaThermometerHalf /> Market Condition
                     </h4>
                     <div className="flex flex-wrap gap-2">
@@ -755,7 +675,7 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
                             <button
                                 key={cond}
                                 onClick={() => setMarketCondition(cond)}
-                                className={`px-3 py-1.5 text-xs font-medium rounded-md border transition ${marketCondition === cond ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-300'}`}
+                                className={`px-3 py-1.5 text-xs font-medium rounded-md border transition ${marketCondition === cond ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-700'}`}
                             >
                                 {cond}
                             </button>
@@ -764,8 +684,8 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
                 </Card>
 
                 {/* 2. Psychology/Mood */}
-                <Card className="p-5">
-                    <h4 className="text-xs font-bold text-slate-400 uppercase mb-3 flex items-center gap-2">
+                <Card className="p-5 bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 transition-colors">
+                    <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase mb-3 flex items-center gap-2">
                         <FaBrain /> Psychology
                     </h4>
                     <div className="flex flex-wrap gap-2 mb-4">
@@ -773,24 +693,24 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
                             <button
                                 key={m}
                                 onClick={() => toggleSelection(m, selectedMoods, setSelectedMoods)}
-                                className={`px-2.5 py-1 text-xs rounded-full border transition ${selectedMoods.includes(m) ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-slate-200 text-slate-500'}`}
+                                className={`px-2.5 py-1 text-xs rounded-full border transition ${selectedMoods.includes(m) ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-400' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400'}`}
                             >
                                 {m}
                             </button>
                         ))}
                     </div>
                     
-                    <h4 className="text-xs font-bold text-slate-400 uppercase mb-2 mt-4 flex items-center gap-2">
+                    <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase mb-2 mt-4 flex items-center gap-2">
                         <FaExclamationTriangle /> Mistakes
                     </h4>
                     <div className="space-y-2">
                         {mistakeOptions.map(err => (
-                            <label key={err} className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer hover:text-slate-900">
+                            <label key={err} className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400 cursor-pointer hover:text-slate-900 dark:hover:text-white transition-colors">
                                 <input 
                                     type="checkbox" 
                                     checked={mistakes.includes(err)}
                                     onChange={() => toggleSelection(err, mistakes, setMistakes)}
-                                    className="rounded text-rose-500 focus:ring-rose-500 border-gray-300"
+                                    className="rounded text-rose-500 focus:ring-rose-500 border-gray-300 dark:border-slate-700 dark:bg-slate-800"
                                 />
                                 {err}
                             </label>
@@ -799,8 +719,8 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
                 </Card>
 
                 {/* 3. Setup Tags */}
-                <Card className="p-5">
-                    <h4 className="text-xs font-bold text-slate-400 uppercase mb-3 flex items-center gap-2">
+                <Card className="p-5 bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 transition-colors">
+                    <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase mb-3 flex items-center gap-2">
                         <FaTag /> Setup Criteria
                     </h4>
                     <div className="flex flex-wrap gap-2">
@@ -808,7 +728,7 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
                             <button
                                 key={i}
                                 onClick={() => toggleSelection(c, selectedCriteria, setSelectedCriteria)}
-                                className={`px-2 py-1 text-[11px] font-semibold uppercase tracking-wide rounded border transition ${selectedCriteria.includes(c) ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-slate-50 border-transparent text-slate-500 hover:bg-slate-100'}`}
+                                className={`px-2 py-1 text-[11px] font-semibold uppercase tracking-wide rounded border transition ${selectedCriteria.includes(c) ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400' : 'bg-slate-50 dark:bg-slate-800 border-transparent text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
                             >
                                 {c}
                             </button>
@@ -819,7 +739,7 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
                             value={newCriteriaInput}
                             onChange={(e) => setNewCriteriaInput(e.target.value)}
                             onKeyDown={addNewCriteria}
-                            className="px-2 py-1 text-[11px] w-16 focus:w-auto transition-all bg-transparent border-b border-dashed border-slate-300 focus:border-indigo-500 outline-none placeholder:text-slate-300"
+                            className="px-2 py-1 text-[11px] w-16 focus:w-auto transition-all bg-transparent border-b border-dashed border-slate-300 dark:border-slate-700 focus:border-indigo-500 outline-none placeholder:text-slate-300 dark:placeholder:text-slate-700 text-slate-700 dark:text-slate-300"
                         />
                     </div>
                 </Card>

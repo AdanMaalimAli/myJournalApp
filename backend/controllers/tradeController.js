@@ -1,5 +1,16 @@
 const Trade = require('../models/Trade');
 
+// Helper to sanitize date to YYYY-MM-DD
+const sanitizeDate = (d) => {
+  if (!d) return null;
+  const parsed = new Date(d);
+  if (isNaN(parsed.getTime())) return d; // Return as is if we can't parse it
+  const y = parsed.getFullYear();
+  const m = String(parsed.getMonth() + 1).padStart(2, '0');
+  const day = String(parsed.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
 // @desc      Get all trades for logged in user
 // @route     GET /api/trades
 // @access    Private
@@ -18,6 +29,7 @@ exports.getTrades = async (req, res) => {
 exports.createTrade = async (req, res) => {
   try {
     req.body.user = req.user.id;
+    if (req.body.date) req.body.date = sanitizeDate(req.body.date);
     const trade = await Trade.create(req.body);
     res.status(201).json({ success: true, data: trade });
   } catch (err) {
@@ -41,6 +53,8 @@ exports.updateTrade = async (req, res) => {
       return res.status(401).json({ success: false, error: 'Not authorized' });
     }
 
+    if (req.body.date) req.body.date = sanitizeDate(req.body.date);
+    
     trade = await Trade.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
       runValidators: true,
@@ -88,6 +102,7 @@ exports.bulkCreateTrades = async (req, res) => {
 
     const bulkOps = trades.map(trade => {
       const tradeData = { ...trade, user: req.user.id };
+      if (tradeData.date) tradeData.date = sanitizeDate(tradeData.date);
       const id = tradeData._id || tradeData.id;
       
       if (id && id.toString().length === 24) { // Valid MongoDB ObjectId

@@ -5,6 +5,7 @@ import App from './App.jsx'
 import { BrowserRouter } from 'react-router-dom'
 import { TradeProvider } from "./context/TradeContext";
 import { AuthProvider } from "./context/AuthContext";
+import { ThemeProvider } from "./context/ThemeContext";
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
 
@@ -13,11 +14,13 @@ console.log("VITE_GOOGLE_CLIENT_ID:", import.meta.env.VITE_GOOGLE_CLIENT_ID);
 createRoot(document.getElementById('root')).render(
   <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
     <AuthProvider>
-      <TradeProvider>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
-      </TradeProvider>
+      <ThemeProvider>
+        <TradeProvider>
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
+        </TradeProvider>
+      </ThemeProvider>
     </AuthProvider>
   </GoogleOAuthProvider>
 )
