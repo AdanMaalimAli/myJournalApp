@@ -8,6 +8,7 @@ import {
 } from "react-icons/fa";
 import { AreaChart, ResponsiveContainer, Area, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine } from "recharts";
 import { useTrades } from "../context/TradeContext";
+import { useTheme } from "../context/ThemeContext";
 
 // --- UI COMPONENTS ---
 const Card = ({ children, className = "" }) => (
@@ -25,7 +26,7 @@ const Badge = ({ children, color = "slate" }) => {
     amber: "bg-amber-50 text-amber-700 border-amber-200",
   };
   return (
-    <span className={`px-2 py-1 rounded text-xs font-semibold border ${colors[color] || colors.slate}`}>
+    <span className={`px-2.5 py-1.5 rounded text-sm font-semibold border ${colors[color] || colors.slate}`}>
       {children}
     </span>
   );
@@ -35,6 +36,7 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
   
   // --- CONTEXT & DATE STATE ---
   const { realTrades, uploadedTrades, isLive, isDemo, journalData, saveDailyJournal, updateTrade, showNotification, importTrades } = useTrades() || {};
+  const { theme } = useTheme();
   const [currentDate, setCurrentDate] = useState(propDate);
 
   // Auto-navigate to latest trade on import/load
@@ -85,9 +87,14 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
             handleInput();
         }
         setSessionRating(data.rating || 0);
+        setRules(data.rules && data.rules.length > 0 ? data.rules : [
+            { name: "Risk management applied", followed: false },
+            { name: "Waited for confirmation", followed: false },
+            { name: "No revenge trading", followed: false },
+            { name: "Exit criteria met", followed: false }
+        ]);
         setMarketCondition(data.condition || "Trending");
         setSelectedMoods(data.moods || []);
-        setMistakes(data.mistakes || []);
         setSelectedCriteria(data.setups || []);
         setImages(data.images || []);
     } else {
@@ -97,9 +104,14 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
             handleInput();
         }
         setSessionRating(0);
+        setRules([
+            { name: "Risk management applied", followed: false },
+            { name: "Waited for confirmation", followed: false },
+            { name: "No revenge trading", followed: false },
+            { name: "Exit criteria met", followed: false }
+        ]);
         setMarketCondition("Trending");
         setSelectedMoods([]);
-        setMistakes([]);
         setSelectedCriteria([]);
         setImages([]);
     }
@@ -140,10 +152,23 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
   const [isEditorEmpty, setIsEditorEmpty] = useState(true);
   
   // New Trader Features State
-  const [sessionRating, setSessionRating] = useState(0); // 1-5 Stars
+  const [sessionRating, setSessionRating] = useState(0); // 1-5 Stars (Replaced by Percentage logic below)
+  const [rules, setRules] = useState([
+    { name: "Risk management applied", followed: false },
+    { name: "Waited for confirmation", followed: false },
+    { name: "No revenge trading", followed: false },
+    { name: "Exit criteria met", followed: false }
+  ]);
+  const [newRuleInput, setNewRuleInput] = useState("");
   const [marketCondition, setMarketCondition] = useState("Trending");
   const [selectedMoods, setSelectedMoods] = useState([]);
-  const [mistakes, setMistakes] = useState([]);
+
+  // Calculate Discipline Percentage
+  const disciplinePercentage = useMemo(() => {
+    if (rules.length === 0) return 0;
+    const followedCount = rules.filter(r => r.followed).length;
+    return Math.round((followedCount / rules.length) * 100);
+  }, [rules]);
   
   // Tags/Criteria
   const [availableCriteria, setAvailableCriteria] = useState([
@@ -154,7 +179,6 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
 
   // --- CONFIG DATA ---
   const moodOptions = ["Focused", "Anxious", "Confident", "Revenge", "FOMO", "Zen"];
-  const mistakeOptions = ["Chased Entry", "Moved Stop", "Oversized", "Early Exit", "No Plan"];
   const conditionOptions = ["Trending", "Ranging", "Choppy", "High Volatility", "Low Volume"];
 
   const tradingTemplates = [
@@ -260,6 +284,23 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
     setList(list.includes(item) ? list.filter(i => i !== item) : [...list, item]);
   };
 
+  const toggleRule = (index) => {
+    const updatedRules = [...rules];
+    updatedRules[index].followed = !updatedRules[index].followed;
+    setRules(updatedRules);
+  };
+
+  const addRule = (e) => {
+    if (e.key === 'Enter' && newRuleInput.trim() !== "") {
+      setRules([...rules, { name: newRuleInput.trim(), followed: false }]);
+      setNewRuleInput("");
+    }
+  };
+
+  const removeRule = (index) => {
+    setRules(rules.filter((_, i) => i !== index));
+  };
+
   const addNewCriteria = (e) => {
     if (e.key === 'Enter' && newCriteriaInput.trim() !== "") {
       const newTag = newCriteriaInput.trim();
@@ -312,10 +353,10 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
         // 1. Save Journal Metadata (Keep text and images)
         const entryData = {
             html: currentText, 
-            rating: sessionRating,
+            rating: disciplinePercentage, // Saving percentage in the rating field
+            rules: rules,
             condition: marketCondition,
             moods: selectedMoods,
-            mistakes: mistakes,
             setups: selectedCriteria,
             images: currentImages 
         };
@@ -362,13 +403,13 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
             <div className="flex items-center gap-4">
                
                 <div>
-                    <h1 className="text-lg font-bold text-slate-900 dark:text-white leading-tight">Journal your Day</h1>
+                    <h1 className="text-xl font-bold text-slate-900 dark:text-white leading-tight">Journal your Day</h1>
                     {/* Date Navigation */}
-                    <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500 dark:text-slate-400 font-medium bg-slate-100/50 dark:bg-slate-800/50 px-2 py-1 rounded-md transition-colors">
-                      <button onClick={() => changeDate(-1)} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition"><FaChevronLeft size={10}/></button>
-                      <span className="min-w-[80px] text-center">{currentDate.toDateString()}</span>
-                      <button onClick={() => changeDate(1)} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition"><FaChevronRight size={10}/></button>
-                      <button onClick={() => setCurrentDate(new Date())} className="ml-1 hover:text-indigo-600 dark:hover:text-indigo-400" title="Go to Today"><FaCalendarDay size={10}/></button>
+                    <div className="flex items-center gap-2 mt-1 text-sm text-slate-500 dark:text-slate-400 font-medium bg-slate-100/50 dark:bg-slate-800/50 px-2.5 py-1.5 rounded-md transition-colors">
+                      <button onClick={() => changeDate(-1)} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition"><FaChevronLeft size={12}/></button>
+                      <span className="min-w-[100px] text-center">{currentDate.toDateString()}</span>
+                      <button onClick={() => changeDate(1)} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition"><FaChevronRight size={12}/></button>
+                      <button onClick={() => setCurrentDate(new Date())} className="ml-1 hover:text-indigo-600 dark:hover:text-indigo-400" title="Go to Today"><FaCalendarDay size={12}/></button>
                     </div>
                 </div>
             </div>
@@ -410,18 +451,19 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
             <Card className="lg:col-span-4 p-6 flex flex-col justify-between bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 transition-colors">
                 <div>
                     <h3 className="text-sm font-bold text-slate-500 dark:text-slate-500 uppercase tracking-wide mb-4 flex items-center gap-2">
-                        <FaStar className="text-amber-400" /> Session Scorecard
+                        <FaStar className="text-amber-400" /> Session Discipline
                     </h3>
                     
                     <div className="flex items-center justify-between mb-6">
                         <div className="flex flex-col">
-                            <span className="text-4xl font-extrabold text-slate-800 dark:text-white">{sessionRating}/5</span>
-                            <span className="text-xs text-slate-400 dark:text-slate-500 mt-1">Discipline Rating</span>
+                            <span className="text-4xl font-extrabold text-slate-800 dark:text-white">{disciplinePercentage}%</span>
+                            <span className="text-xs text-slate-400 dark:text-slate-500 mt-1">Rules Followed</span>
                         </div>
-                        <div className="flex gap-1">
-                            {[1,2,3,4,5].map(star => (
-                                <button key={star} onClick={() => setSessionRating(star)} className={`text-2xl transition hover:scale-110 ${star <= sessionRating ? 'text-amber-400' : 'text-slate-200'}`}>★</button>
-                            ))}
+                        <div className="w-24 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                            <div 
+                                className={`h-full transition-all duration-500 ${disciplinePercentage >= 80 ? 'bg-emerald-500' : disciplinePercentage >= 50 ? 'bg-amber-500' : 'bg-rose-500'}`}
+                                style={{ width: `${disciplinePercentage}%` }}
+                            />
                         </div>
                     </div>
                     
@@ -651,7 +693,7 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
                                                 </div>
                                             </td>
                                             <td className={`px-6 py-3 text-right font-mono font-bold ${t.pnl >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
-                                                {t.pnl >= 0 ? "+" : "-"}${Math.abs(t.pnl)}
+                                                {t.pnl >= 0 ? "+" : "-"}${Math.abs(t.pnl).toFixed(2)}
                                             </td>
                                         </tr>
                                     ))}
@@ -666,16 +708,16 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
             <div className="space-y-6">
                 
                 {/* 1. Market Conditions */}
-                <Card className="p-5 bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 transition-colors">
-                    <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase mb-3 flex items-center gap-2">
+                <Card className="p-6 bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 transition-colors">
+                    <h4 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase mb-4 flex items-center gap-2">
                         <FaThermometerHalf /> Market Condition
                     </h4>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2.5">
                         {conditionOptions.map(cond => (
                             <button
                                 key={cond}
                                 onClick={() => setMarketCondition(cond)}
-                                className={`px-3 py-1.5 text-xs font-medium rounded-md border transition ${marketCondition === cond ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-700'}`}
+                                className={`px-4 py-2 text-sm font-medium rounded-lg border transition ${marketCondition === cond ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-700'}`}
                             >
                                 {cond}
                             </button>
@@ -683,52 +725,58 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
                     </div>
                 </Card>
 
-                {/* 2. Psychology/Mood */}
-                <Card className="p-5 bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 transition-colors">
-                    <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase mb-3 flex items-center gap-2">
-                        <FaBrain /> Psychology
+                {/* 2. Rules Checklist */}
+                <Card className="p-6 bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 transition-colors">
+                    <h4 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase mb-4 flex items-center gap-2">
+                        <FaBrain /> Rules Checklist
                     </h4>
-                    <div className="flex flex-wrap gap-2 mb-4">
-                        {moodOptions.map(m => (
-                            <button
-                                key={m}
-                                onClick={() => toggleSelection(m, selectedMoods, setSelectedMoods)}
-                                className={`px-2.5 py-1 text-xs rounded-full border transition ${selectedMoods.includes(m) ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-400' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400'}`}
-                            >
-                                {m}
-                            </button>
+                    {/* Rules Checklist */}
+                    <div className="space-y-3 mb-6 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                        {rules.map((rule, idx) => (
+                            <div key={idx} className="flex items-center justify-between group">
+                                <label className="flex items-center gap-3.5 cursor-pointer flex-1">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={rule.followed} 
+                                        onChange={() => toggleRule(idx)}
+                                        className="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:bg-slate-800 dark:border-slate-700"
+                                    />
+                                    <span className={`text-base transition-colors ${rule.followed ? 'text-slate-400 line-through' : 'text-slate-700 dark:text-slate-300'}`}>
+                                        {rule.name}
+                                    </span>
+                                </label>
+                                <button 
+                                    onClick={() => removeRule(idx)}
+                                    className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all p-1.5"
+                                >
+                                    <FaTimes size={12} />
+                                </button>
+                            </div>
                         ))}
-                    </div>
-                    
-                    <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase mb-2 mt-4 flex items-center gap-2">
-                        <FaExclamationTriangle /> Mistakes
-                    </h4>
-                    <div className="space-y-2">
-                        {mistakeOptions.map(err => (
-                            <label key={err} className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400 cursor-pointer hover:text-slate-900 dark:hover:text-white transition-colors">
-                                <input 
-                                    type="checkbox" 
-                                    checked={mistakes.includes(err)}
-                                    onChange={() => toggleSelection(err, mistakes, setMistakes)}
-                                    className="rounded text-rose-500 focus:ring-rose-500 border-gray-300 dark:border-slate-700 dark:bg-slate-800"
-                                />
-                                {err}
-                            </label>
-                        ))}
+                        <div className="pt-3">
+                            <input 
+                                type="text"
+                                value={newRuleInput}
+                                onChange={(e) => setNewRuleInput(e.target.value)}
+                                onKeyDown={addRule}
+                                placeholder="+ Add new rule..."
+                                className="w-full text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2.5 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-700 dark:text-slate-300"
+                            />
+                        </div>
                     </div>
                 </Card>
 
                 {/* 3. Setup Tags */}
-                <Card className="p-5 bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 transition-colors">
-                    <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase mb-3 flex items-center gap-2">
+                <Card className="p-6 bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 transition-colors">
+                    <h4 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase mb-4 flex items-center gap-2">
                         <FaTag /> Setup Criteria
                     </h4>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2.5">
                         {availableCriteria.map((c, i) => (
                             <button
                                 key={i}
                                 onClick={() => toggleSelection(c, selectedCriteria, setSelectedCriteria)}
-                                className={`px-2 py-1 text-[11px] font-semibold uppercase tracking-wide rounded border transition ${selectedCriteria.includes(c) ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400' : 'bg-slate-50 dark:bg-slate-800 border-transparent text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
+                                className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wide rounded-md border transition ${selectedCriteria.includes(c) ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400' : 'bg-slate-50 dark:bg-slate-800 border-transparent text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
                             >
                                 {c}
                             </button>
@@ -739,7 +787,7 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
                             value={newCriteriaInput}
                             onChange={(e) => setNewCriteriaInput(e.target.value)}
                             onKeyDown={addNewCriteria}
-                            className="px-2 py-1 text-[11px] w-16 focus:w-auto transition-all bg-transparent border-b border-dashed border-slate-300 dark:border-slate-700 focus:border-indigo-500 outline-none placeholder:text-slate-300 dark:placeholder:text-slate-700 text-slate-700 dark:text-slate-300"
+                            className="px-3 py-1.5 text-xs w-20 focus:w-auto transition-all bg-transparent border-b border-dashed border-slate-300 dark:border-slate-700 focus:border-indigo-500 outline-none placeholder:text-slate-300 dark:placeholder:text-slate-700 text-slate-700 dark:text-slate-300"
                         />
                     </div>
                 </Card>
@@ -750,12 +798,12 @@ export default function DailyJournal({ date: propDate = new Date(), trades: prop
       </div>
 
       {/* --- FOOTER --- */}
-      <footer className="max-w-7xl mx-auto px-6 py-8 border-t border-slate-200 mt-12 flex flex-col md:flex-row justify-between items-center text-slate-400 text-sm">
+      <footer className="max-w-7xl mx-auto px-6 py-10 border-t border-slate-200 mt-12 flex flex-col md:flex-row justify-between items-center text-slate-400 text-base">
            <div>© {new Date().getFullYear()} MyJournal Pro. <span className="hidden md:inline">Built for performance.</span></div>
-           <div className="flex gap-6 mt-4 md:mt-0">
-               <FaTwitter className="hover:text-sky-500 cursor-pointer transition" />
-               <FaDiscord className="hover:text-indigo-500 cursor-pointer transition" />
-               <FaGlobe className="hover:text-slate-600 cursor-pointer transition" />
+           <div className="flex gap-8 mt-6 md:mt-0">
+               <FaTwitter size={20} className="hover:text-sky-500 cursor-pointer transition" />
+               <FaDiscord size={20} className="hover:text-indigo-500 cursor-pointer transition" />
+               <FaGlobe size={20} className="hover:text-slate-600 cursor-pointer transition" />
            </div>
       </footer>
     </div>

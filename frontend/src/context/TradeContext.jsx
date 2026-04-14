@@ -120,7 +120,7 @@ export const TradeProvider = ({ children }) => {
             const pnl = parseFloat(val(colMap.pnl).replace(/[$\s,]/g, ""));
             if (!cleanDate || isNaN(pnl)) return null;
             return { 
-              ticket: val(colMap.ticket) || `tmp-${i}`, 
+              ticket: val(colMap.ticket) || `tmp-${i}-${Date.now()}`, 
               date: cleanDate, 
               pair: val(colMap.pair).toUpperCase(), 
               pnl,
@@ -132,8 +132,29 @@ export const TradeProvider = ({ children }) => {
             };
           }).filter(t => t !== null);
 
-          setUploadedTrades(parsed);
-          showNotification(`CSV Loaded: ${parsed.length} trades.`, "success");
+          // Save to database
+          if (token && parsed.length > 0) {
+            const res = await fetch('/api/trades/bulk', {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({ trades: parsed })
+            });
+
+            if (res.ok) {
+              const savedTradesData = await res.json();
+              setArchivedTrades(savedTradesData.data);
+              setUploadedTrades([]);
+              showNotification(`CSV Imported and Saved: ${parsed.length} trades.`, "success");
+            } else {
+              showNotification("Failed to save trades to database", "error");
+            }
+          } else {
+            setUploadedTrades(parsed);
+            showNotification(`CSV Loaded: ${parsed.length} trades. (Not logged in)`, "info");
+          }
           resolve(parsed);
         } catch (err) { reject(err); }
       };

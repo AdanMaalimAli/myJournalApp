@@ -466,7 +466,7 @@ const weeklyPnl = useMemo(() => {
                 </div>
               </div>
               
-              <div className="grid grid-cols-7 gap-3">
+              <div className="grid grid-cols-7 gap-2">
                 {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
                     <div key={day} className="text-center text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">{day}</div>
                 ))}
@@ -500,22 +500,22 @@ const weeklyPnl = useMemo(() => {
                         key={item.key}
                         onClick={() => !item.isWeekend && setSelectedDay(item)}
                         className={`
-                        h-24 rounded-xl p-3 relative flex flex-col justify-between border transition-all duration-200
+                        h-24 rounded-xl p-2 relative flex flex-col justify-between border transition-all duration-200
                         ${bgClass} ${borderClass}
                         ${!item.isWeekend ? 'cursor-pointer hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-md' : 'cursor-default'}
                         ${isSelected ? 'ring-2 ring-indigo-500 ring-offset-2 dark:ring-offset-slate-900 z-10 shadow-lg !border-indigo-500' : ''}
                         `}
                     >
-                        <span className={`text-xs font-semibold ${isSelected ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500'}`}>
+                        <span className={`text-xs font-bold ${isSelected ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500'}`}>
                             {item.dayOfMonth}
                         </span>
                         
                         {!item.isWeekend && item.trades > 0 && (
-                        <div className="mt-1">
-                            <div className={`text-sm font-bold ${textClass}`}>
-                                {item.pnl >= 0 ? '+' : ''}{item.pnl.toFixed(2)}
+                        <div className="mt-auto overflow-hidden">
+                            <div className={`text-[13px] font-extrabold ${textClass} truncate`} title={item.pnl.toFixed(2)}>
+                                {item.pnl >= 0 ? '+' : ''}{item.pnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </div>
-                            <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 font-medium">
+                            <div className="text-[10px] text-slate-400 dark:text-slate-500 font-bold truncate">
                                 {item.trades} Trades
                             </div>
                         </div>

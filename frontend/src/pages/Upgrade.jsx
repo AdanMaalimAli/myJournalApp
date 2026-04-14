@@ -48,13 +48,16 @@ export default function Upgrade() {
   };
 
   const startPolling = () => {
+    console.log('Starting payment verification poll...');
     let attempts = 0;
     const interval = setInterval(async () => {
       attempts++;
-      if (attempts > 30) {
+      console.log(`Polling attempt ${attempts}/40...`);
+      
+      if (attempts > 40) {
         clearInterval(interval);
         setStatus('error');
-        setMessage('Payment verification timed out. If you paid, it will reflect shortly.');
+        setMessage('Verification is taking longer than expected. If you have paid, your account will be upgraded automatically within a few minutes.');
         return;
       }
 
@@ -62,28 +65,50 @@ export default function Upgrade() {
         const res = await fetch('/api/payments/status', {
           headers: { Authorization: `Bearer ${token}` }
         });
+        
+        if (!res.ok) {
+          console.warn(`Poll request failed with status: ${res.status}`);
+          return; // Continue polling
+        }
+
         const data = await res.json();
+        console.log('Poll response data:', data);
         
         if (data.success) {
           if (data.isPro) {
+            console.log('SUCCESS: User is now Pro!');
             clearInterval(interval);
-            setStatus('success');
-            setMessage('Welcome to Pro Trader! Your account has been upgraded.');
-            await refreshUser(); // Update AuthContext
-            setTimeout(() => {
-              navigate('/dashboard/performance');
-              window.location.reload(); 
-            }, 4000);
+            
+            // 1. Show intermediate "Finalizing" message for a realistic feel
+            setMessage('Payment received! Finalizing your Pro upgrade...');
+            
+            setTimeout(async () => {
+                setStatus('success');
+                setMessage('Success! Welcome to Pro Trader.');
+                
+                // 2. Refresh the Auth Context
+                await refreshUser(); 
+                
+                // 3. Final redirect after another brief delay
+                setTimeout(() => {
+                  window.location.href = '/dashboard/performance';
+                }, 3000);
+            }, 3500); // 3.5 second delay after payment reaches sandbox
+            
           } else if (data.paymentStatus === 'Failed' || data.paymentStatus === 'Cancelled') {
+            console.log(`Payment status changed to: ${data.paymentStatus}`);
             clearInterval(interval);
             setStatus('error');
-            setMessage(`Payment ${data.paymentStatus.toLowerCase()}. Please try again.`);
+            setMessage(`Payment ${data.paymentStatus.toLowerCase()}. Please try again or contact support.`);
+          } else {
+            // Still pending
+            setMessage('Waiting for payment confirmation...');
           }
         }
       } catch (err) {
         console.error('Polling error:', err);
       }
-    }, 4000);
+    }, 5000); // 5 seconds interval
   };
 
   if (user?.isPro && status !== 'success') {

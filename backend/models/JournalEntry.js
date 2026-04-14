@@ -30,7 +30,13 @@ const journalEntrySchema = new mongoose.Schema({
   },
   images: {
     type: [String],
-  }
+  },
+  rules: [
+    {
+      name: { type: String, required: true },
+      followed: { type: Boolean, default: false }
+    }
+  ]
 }, {
   timestamps: true,
 });

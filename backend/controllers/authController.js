@@ -117,7 +117,8 @@ exports.getMe = async (req, res, next) => {
           id: user._id,
           username: user.username,
           email: user.email,
-          profilePicture: user.profilePicture
+          profilePicture: user.profilePicture,
+          isPro: user.isPro
         },
       });
   } catch (err) {
@@ -255,7 +256,8 @@ const sendTokenResponse = (user, statusCode, res) => {
         id: user._id,
         username: user.username,
         email: user.email,
-        profilePicture: user.profilePicture
+        profilePicture: user.profilePicture,
+        isPro: user.isPro
       }
     });
 };

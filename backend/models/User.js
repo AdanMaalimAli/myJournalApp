@@ -39,6 +39,14 @@ const userSchema = new mongoose.Schema({
   lastCheckoutRequestID: {
     type: String,
   },
+  lastPaymentStatus: {
+    type: String,
+    enum: ['Pending', 'Success', 'Failed', 'Cancelled', 'None'],
+    default: 'None'
+  },
+  lastPaymentCheck: {
+    type: Date
+  },
   brokerAccount: {
     platform: {
       type: String, // MT4, MT5, DXTrade, MatchTrader, cTrader
@@ -48,6 +56,7 @@ const userSchema = new mongoose.Schema({
     accountNumber: String,
     brokerServer: String,
     apiKey: String, // Encrypted or from a service like MetaAPI
+    metaApiAccountId: String, // ID returned by MetaAPI after provisioning
     connectionStatus: {
       type: String,
       enum: ['Connected', 'Disconnected', 'Error', 'Pending'],
@@ -64,9 +73,9 @@ const userSchema = new mongoose.Schema({
 });
 
 // Encrypt password using bcrypt
-userSchema.pre('save', async function (next) {
+userSchema.pre('save', async function () {
   if (!this.isModified('password')) {
-    next();
+    return;
   }
 
   const salt = await bcrypt.genSalt(10);
