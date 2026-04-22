@@ -165,14 +165,15 @@ const calendarGrid = useMemo(() => {
       if (isLive && !isDemo) {
           // MODE 1: LIVE DATA
           const dayString = formatDate(date);
-          
-          // Combine permanent archived trades with temporary uploaded session trades
-          const allCurrentTrades = [...realTrades, ...(uploadedTrades || [])];
+
+          // Use realTrades from TradeContext which already combines/prioritizes correctly
+          const allCurrentTrades = realTrades || [];
           const matches = allCurrentTrades.filter(t => t.date === dayString);
-          
+
           trades = matches.length;
           pnl = matches.reduce((acc, curr) => acc + (parseFloat(curr.pnl) || 0), 0);
-      } else if (!isLive || isDemo) {
+      }
+ else if (!isLive || isDemo) {
           // MODE 2: ORIGINAL DEMO LOGIC
           if (!isWeekend && Math.random() > 0.4) {
               trades = Math.floor(Math.random() * 5) + 1;

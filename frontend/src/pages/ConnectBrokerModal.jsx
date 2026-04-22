@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { FaServer, FaUser, FaKey, FaLink, FaCheckCircle, FaCircleNotch, FaExclamationTriangle } from 'react-icons/fa';
 import Modal from '../components/Modal';
 import { useAuth } from '../context/AuthContext';
+import { useTrades } from '../context/TradeContext';
 
 export default function ConnectBrokerModal({ onClose }) {
   const { token, user, refreshUser } = useAuth();
+  const { refreshData } = useTrades();
   const navigate = useNavigate();
   const [platform, setPlatform] = useState('MT5');
   const [accountNumber, setAccountNumber] = useState('');
@@ -38,10 +40,31 @@ export default function ConnectBrokerModal({ onClose }) {
       const data = await res.json();
 
       if (res.ok) {
-        setStatus('success');
-        setMessage('Broker connected! Your trades will now sync automatically.');
-        await refreshUser();
-        setTimeout(() => onClose(), 3000);
+        setStatus('connecting');
+        setMessage('Broker connected! Fetching your trade history...');
+        
+        // Trigger initial sync
+        const syncRes = await fetch('/api/broker/sync', {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${token}`
+            }
+        });
+
+        const syncData = await syncRes.json();
+        
+        if (syncRes.ok) {
+            setStatus('success');
+            setMessage(`Successfully synced ${syncData.count || 0} trades!`);
+            await refreshUser();
+            await refreshData();
+            setTimeout(() => onClose(), 3000);
+        } else {
+            setStatus('success');
+            setMessage('Broker connected, but trade sync failed. You can sync manually from the dashboard.');
+            await refreshUser();
+            setTimeout(() => onClose(), 3000);
+        }
       } else {
         setStatus('error');
         setMessage(data.error || 'Failed to connect broker');

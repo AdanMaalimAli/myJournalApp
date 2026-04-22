@@ -19,12 +19,8 @@ export default function TradesHistory() {
   
   const tradesToDisplay = useMemo(() => {
     if (!isLive) return [];
-    // Show archived trades even if performance is in demo mode
-    return realTrades.filter(trade => {
-      const hasJournalData = journalData && journalData[trade.date];
-      return trade.journalNote || trade.setup || hasJournalData;
-    });
-  }, [realTrades, isLive, journalData]);
+    return realTrades;
+  }, [realTrades, isLive]);
 
   const groupedTrades = useMemo(() => {
     const groups = {};

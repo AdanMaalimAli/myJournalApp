@@ -9,17 +9,22 @@ exports.connectBroker = async (req, res) => {
   const { platform, accountNumber, brokerServer, apiKey } = req.body;
 
   try {
+    const user = await User.findById(req.user.id);
+    if (!user.isPro) {
+        return res.status(403).json({ success: false, error: 'Upgrade to Pro to connect broker' });
+    }
+
     // 1. Provision account in MetaAPI
     const provisionedAccount = await metaApi.provisionAccount({
         name: `User-${req.user.id}`,
         login: accountNumber,
         password: apiKey, // Using apiKey field as MT4/MT5 password
         server: brokerServer,
-        platform: platform.toLowerCase() // 'mt4' or 'mt5'
+        platform: platform.toLowerCase() // 'mt4', 'mt5', 'dxtrade', etc.
     });
 
     // 2. Save MetaAPI account ID and details to user
-    const user = await User.findByIdAndUpdate(
+    const updatedUser = await User.findByIdAndUpdate(
       req.user.id,
       {
         brokerAccount: {
@@ -41,12 +46,21 @@ exports.connectBroker = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: user.brokerAccount
+      data: updatedUser.brokerAccount
     });
 
   } catch (error) {
     console.error('MetaAPI Connection Error:', error);
     
+    // Check if it's a MetaAPI validation error
+    if (error.details) {
+        return res.status(400).json({ 
+            success: false, 
+            error: 'Broker validation failed', 
+            details: error.details 
+        });
+    }
+
     let errorMessage = error.message;
     if (error.status === 403) {
         errorMessage = 'MetaAPI account limit reached or top-up required. Please check your MetaAPI dashboard.';
@@ -59,8 +73,6 @@ exports.connectBroker = async (req, res) => {
 };
 
 // @desc      Sync trades from broker
-// @route     POST /api/broker/sync
-// @access    Private
 exports.syncBrokerTrades = async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
@@ -73,29 +85,53 @@ exports.syncBrokerTrades = async (req, res) => {
         return res.status(400).json({ success: false, error: 'Broker not connected' });
     }
 
-    // Connect and fetch history (e.g., last 30 days)
+    // Connect and fetch history (last 90 days)
     const startTime = new Date();
-    startTime.setDate(startTime.getDate() - 30);
+    startTime.setDate(startTime.getDate() - 90);
     const endTime = new Date();
 
-    const connection = await metaApi.getRpcConnection(user.brokerAccount.metaApiAccountId);
+    const connection = await metaApi.getRpcConnection(user.brokerAccount.metaApiAccountId, user.brokerAccount.platform);
+    const platform = user.brokerAccount.platform.toUpperCase();
     
-    // Using getHistoryDealsByTimeRange for actual closed trades/profits
-    const deals = await connection.getHistoryDealsByTimeRange(startTime, endTime);
-    
-    // Filter and map to our Trade model
-    // Note: This is a simplified mapping. Real deal history can be complex (entries vs exits)
-    const tradesToSave = deals.filter(deal => deal.entryType === 'DEAL_ENTRY_OUT').map(deal => ({
-        user: req.user.id,
-        ticket: deal.id,
-        date: new Date(deal.time).toISOString().split('T')[0],
-        pair: deal.symbol,
-        type: deal.type.includes('BUY') ? 'Buy' : 'Sell',
-        pnl: deal.profit + (deal.commission || 0) + (deal.swap || 0),
-        lots: deal.volume,
-        entry: deal.price, // For 'OUT' deal, this is actually the exit price, but simple sync for now
-        commission: deal.commission,
-    }));
+    let tradesToSave = [];
+
+    if (platform === 'MT5') {
+        const deals = await connection.getHistoryDealsByTimeRange(startTime, endTime);
+        // Only take OUT deals (closing a position) as they contain the profit/loss
+        tradesToSave = deals
+            .filter(deal => deal.entryType === 'DEAL_ENTRY_OUT')
+            .map(deal => ({
+                user: req.user.id,
+                ticket: deal.id,
+                date: new Date(deal.time).toISOString().split('T')[0],
+                pair: deal.symbol,
+                type: deal.type.includes('BUY') ? 'Buy' : 'Sell',
+                pnl: (deal.profit || 0) + (deal.commission || 0) + (deal.swap || 0),
+                lots: deal.volume,
+                entry: 0, // In MT5, entry price is on the IN deal, leaving as 0 for now
+                exit: deal.price,
+                commission: deal.commission || 0,
+                roi: 0
+            }));
+    } else {
+        // MT4, DXTrade, MatchTrader use HistoryOrders for closed trades
+        const historyOrders = await connection.getHistoryOrdersByTimeRange(startTime, endTime);
+        tradesToSave = historyOrders
+            .filter(order => order.state === 'ORDER_STATE_FILLED' && (order.type.includes('BUY') || order.type.includes('SELL')))
+            .map(order => ({
+                user: req.user.id,
+                ticket: order.id,
+                date: new Date(order.doneTime || order.time).toISOString().split('T')[0],
+                pair: order.symbol,
+                type: order.type.includes('BUY') ? 'Buy' : 'Sell',
+                pnl: (order.profit || 0) + (order.commission || 0) + (order.swap || 0),
+                lots: order.volume,
+                entry: order.openPrice || 0,
+                exit: order.closePrice || 0,
+                commission: order.commission || 0,
+                roi: 0
+            }));
+    }
 
     // Simple bulk upsert (avoid duplicates by ticket)
     for (const tradeData of tradesToSave) {

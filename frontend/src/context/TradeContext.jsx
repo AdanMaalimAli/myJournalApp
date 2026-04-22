@@ -4,7 +4,7 @@ import { useAuth } from './AuthContext';
 const TradeContext = createContext();
 
 export const TradeProvider = ({ children }) => {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [uploadedTrades, setUploadedTrades] = useState([]); 
   const [archivedTrades, setArchivedTrades] = useState([]); 
   const [journalData, setJournalData] = useState({});
@@ -38,31 +38,32 @@ export const TradeProvider = ({ children }) => {
   }, [currentMonth]);
 
   // --- 1. INITIAL FETCH ---
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!token) {
-        setArchivedTrades([]);
-        setJournalData({});
-        return;
+  const fetchData = async () => {
+    if (!token) {
+      setArchivedTrades([]);
+      setJournalData({});
+      return;
+    }
+    setLoading(true);
+    try {
+      const [tradesRes, journalRes] = await Promise.all([
+        fetch('/api/trades', { headers: { Authorization: `Bearer ${token}` } }),
+        fetch('/api/journal', { headers: { Authorization: `Bearer ${token}` } })
+      ]);
+      if (tradesRes.ok) {
+        const tradesData = await tradesRes.json();
+        setArchivedTrades(tradesData.data || []);
       }
-      setLoading(true);
-      try {
-        const [tradesRes, journalRes] = await Promise.all([
-          fetch('/api/trades', { headers: { Authorization: `Bearer ${token}` } }),
-          fetch('/api/journal', { headers: { Authorization: `Bearer ${token}` } })
-        ]);
-        if (tradesRes.ok) {
-          const tradesData = await tradesRes.json();
-          setArchivedTrades(tradesData.data || []);
-        }
-        if (journalRes.ok) {
-          const journalDataJson = await journalRes.json();
-          const formattedJournal = {};
-          (journalDataJson.data || []).forEach(entry => { formattedJournal[entry.date] = entry; });
-          setJournalData(formattedJournal);
-        }
-      } catch (err) { console.error(err); } finally { setLoading(false); }
-    };
+      if (journalRes.ok) {
+        const journalDataJson = await journalRes.json();
+        const formattedJournal = {};
+        (journalDataJson.data || []).forEach(entry => { formattedJournal[entry.date] = entry; });
+        setJournalData(formattedJournal);
+      }
+    } catch (err) { console.error(err); } finally { setLoading(false); }
+  };
+
+  useEffect(() => {
     fetchData();
   }, [token]);
 
@@ -211,10 +212,19 @@ export const TradeProvider = ({ children }) => {
 
   const syncData = useMemo(() => {
     const archivedTickets = new Set(archivedTrades.map(t => t.ticket));
-    const combinedTrades = [
-        ...archivedTrades,
-        ...uploadedTrades.filter(t => !archivedTickets.has(t.ticket))
-    ];
+    
+    // If broker is connected, prioritize archived (broker) trades and ignore uploaded session trades
+    const isBrokerConnected = user?.brokerAccount?.metaApiAccountId;
+    
+    let combinedTrades = [];
+    if (isBrokerConnected) {
+        combinedTrades = [...archivedTrades];
+    } else {
+        combinedTrades = [
+            ...archivedTrades,
+            ...uploadedTrades.filter(t => !archivedTickets.has(t.ticket))
+        ];
+    }
 
     const source = combinedTrades; 
     const parseDate = (d) => {
@@ -304,9 +314,10 @@ export const TradeProvider = ({ children }) => {
       updateTrade,
       showNotification,
       journalData,
-      loading
+      loading,
+      refreshData: fetchData
     };
-  }, [uploadedTrades, archivedTrades, journalData, currentMonth, selectedDay, loading, token]);
+  }, [uploadedTrades, archivedTrades, journalData, currentMonth, selectedDay, loading, token, user]);
 
   return (
     <TradeContext.Provider value={syncData}>
